@@ -26,10 +26,6 @@ describe HTMLify::HTMLifier do
       widget.name = "me"
       subject.htmlify(widget).should =~ %r{<input name="name" type="text" value="me"/>}
     end
-    it "allows text as a field type"
-    it "allows select as a field type"
-    it "allows radio buttons as a field type"
-    it "allows a check box as a field type"
   end
   
   describe "#with_parameter" do
@@ -59,12 +55,38 @@ describe HTMLify::HTMLifier do
     it "makes no-arg methods available as submit buttons" do
       widget = Widget.new
       subject.scan_method(widget, :no_args)
-      subject.htmlify(widget).should =~ %r{<input type="submit" name="no_args" value="no_args"/>}
+      subject.htmlify(widget).should =~ %r{<input name="no_args" value="no_args" type="submit"/>}
       widget.should_receive(:no_args)
       subject.apply_parameters(widget, {"no_args" => "no_args"})
     end
-    it "makes methods with arguments available as inputs"
-    it "uses a text field by default for each argument type"
+    it "makes methods with one argument available as inputs" do
+      widget = Widget.new
+      subject.scan_method(widget, :one_arg)
+      subject.htmlify(widget).should =~ %r{<input.*name="one_arg".*/>}
+      widget.should_receive(:one_arg).with('argument')
+      subject.apply_parameters(widget, {"one_arg" => "argument"})
+    end
+    it "uses a text field by default for each argument type" do
+      widget = Widget.new
+      subject.scan_method(widget, :one_arg)
+      subject.htmlify(widget).should =~ %r{<input.*name="one_arg".*type="text"/>}
+    end
+    it "allows text as a field type" do
+      widget = Widget.new
+      subject.scan_method(widget, :one_arg, :type => 'text')
+      subject.htmlify(widget).should =~ %r{<input.*name="one_arg".*type="text"/>}
+    end
+    it "allows select as a field type" do
+      widget = Widget.new
+      subject.scan_method(widget, :one_arg, :type => 'select', :options => [['cheap', 'Honda'], ['expensive', 'Mercedes']])
+      match = %r{<select.*</select>}.match(subject.htmlify(widget))
+      match.should_not be_nil
+      select = match[0]
+      select.should =~ %r{<option.*value="Honda".*>cheap</option>}
+      select.should =~ %r{<option.*value="Mercedes".*>expensive</option>}
+    end
+    it "allows radio buttons as a field type"
+    it "allows a check box as a field type"
     it "fills in setter field defaults from corresponding getters"
     it "displays getters with no corresponding setters as static text"
   end

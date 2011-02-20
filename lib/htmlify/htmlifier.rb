@@ -40,15 +40,33 @@ EOD
     object
   end
   
-  def scan_method(object, name)
-    argument_count = object.method(name.to_sym).arity
-    case
-    when argument_count == 0
-      specify_method_html(name) {|object| %Q{<input type="submit" name="#{name}" value="#{name}"/>}}
+  def scan_method(object, name, options = {})
+    options[:type] ||= 'text'
+    target_method = object.method(name.to_sym) or raise "method #{name} not found on #{object}"
+    argument_count = target_method.arity
+    if argument_count == 0
+      specify_method_html(name) {|object| %Q{<input name="#{name}" value="#{name}" type="submit"/>}}
       with_parameter(name) {|object, value| object.send(name.to_sym)}
-    when argument_count >= 1
+    elsif argument_count >= 1 and options[:type] == 'select'
+      specify_method_html(name) {|object| make_select(name, options[:options])}
+      with_parameter(name) {|object, value| object.send(name.to_sym, value)}
+    elsif argument_count >= 1
+      specify_method_html(name) {|object| %Q{<input name="#{name}" type="#{options[:type]}"/>}}
+      with_parameter(name) {|object, value| object.send(name.to_sym, value)}
+    else
+      raise "Invalid options: #{options}"
     end
   end
+  
+  private
+  
+    def make_select(name, choices)
+      tag =  %Q{<select name="#{name}>"}
+      choices.each do |choice|
+        tag << %Q{<option value="#{choice[1]}">#{choice[0]}</option>}
+      end
+      tag << %Q{</select>}
+    end
   
 end
   
