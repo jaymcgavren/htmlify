@@ -12,8 +12,8 @@ class HTMLifier
     self
   end
   
-  def with_parameter(name, &converter)
-    @parameter_converters[name.to_s] = converter
+  def with_parameters(*names, &converter)
+    @parameter_converters[names] = converter
     self
   end
   
@@ -33,9 +33,9 @@ EOD
   end
 
   def apply_parameters(object, parameters)
-    parameters.each do |parameter, value|
-      converter = @parameter_converters[parameter] or raise "no parameter converter available for #{parameter}"
-      converter.call(object, value)
+    @parameter_converters.each do |names, converter|
+      name_strings = names.map{|n| n.to_s}
+      converter.call(object, *parameters.values_at(*name_strings))
     end
     object
   end
@@ -46,16 +46,33 @@ EOD
     argument_count = target_method.arity
     if argument_count == 0
       specify_method_html(name) {|object| %Q{<input name="#{name}" value="#{name}" type="submit"/>}}
-      with_parameter(name) {|object, value| object.send(name.to_sym)}
-    elsif argument_count >= 1 and options[:type] == 'select'
+      with_parameters(name) {|object, value| object.send(name.to_sym)}
+    elsif argument_count == 1 and options[:type] == 'select'
       specify_method_html(name) {|object| make_select(name, options[:options])}
-      with_parameter(name) {|object, value| object.send(name.to_sym, value)}
-    elsif argument_count >= 1
+      with_parameters(name) {|object, value| object.send(name.to_sym, value) unless value == ""}
+    elsif argument_count == 1
       specify_method_html(name) {|object| %Q{<input name="#{name}" type="#{options[:type]}"/>}}
-      with_parameter(name) {|object, value| object.send(name.to_sym, value)}
+      with_parameters(name) {|object, value| object.send(name.to_sym, value) unless value == ""}
+    elsif argument_count >= 2
+      parameter_names = (0..(argument_count - 1)).map{|index| "#{name}[#{index}]"}
+      specify_method_html(name) do |object|
+        inputs = ""
+        parameter_names.each do |parameter_name|
+          inputs << %Q{<input name="#{parameter_name}" type="#{options[:type]}"/>}
+        end
+        inputs
+      end
+      #Watch the splat before *parameter_names: with_parameters should be called with a group of arguments, not a single array!
+      with_parameters(*parameter_names) {|object, *values| object.send(name.to_sym, *values)}
+    elsif argument_count == -1
+      warn "#{object}.#{name} method takes a variable number of arguments; please call specify_method_html and with_parameters manually"
     else
       raise "Invalid options: #{options}"
     end
+  end
+  
+  def scan_methods(object)
+    object.methods.each{|m| scan_method(object, m)}
   end
   
   private

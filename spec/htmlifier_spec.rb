@@ -28,9 +28,9 @@ describe HTMLify::HTMLifier do
     end
   end
   
-  describe "#with_parameter" do
-    it "takes parameter name and a block to pass parameter value to" do
-      subject.with_parameter("name") do |widget, value|
+  describe "#with_parameters" do
+    it "takes parameter names and a block to pass parameter values to" do
+      subject.with_parameters("name") do |widget, value|
         widget.name = value
       end
       widget = Widget.new
@@ -38,7 +38,7 @@ describe HTMLify::HTMLifier do
       widget.name.should == "me"
     end
     it "allows conversion to Integer" do
-      subject.with_parameter("id") do |widget, value|
+      subject.with_parameters("id") do |widget, value|
         widget.id = value.to_i
       end
       widget = Widget.new
@@ -62,33 +62,58 @@ describe HTMLify::HTMLifier do
     it "makes methods with one argument available as inputs" do
       widget = Widget.new
       subject.scan_method(widget, :one_arg)
-      subject.htmlify(widget).should =~ %r{<input.*name="one_arg".*/>}
+      subject.htmlify(widget).should =~ %r{<input.*?name="one_arg".*/>}
       widget.should_receive(:one_arg).with('argument')
       subject.apply_parameters(widget, {"one_arg" => "argument"})
+    end
+    it "makes methods with more than one argument available as multiple inputs" do
+      widget = Widget.new
+      subject.scan_method(widget, :two_args)
+      html = subject.htmlify(widget)
+      html.should =~ %r{<input.*?name="two_args\[0\]".*?/>}
+      html.should =~ %r{<input.*?name="two_args\[1\]".*?/>}
+      widget.should_receive(:two_args).with('arg1', 'arg2')
+      subject.apply_parameters(widget, {"two_args[0]" => "arg1", "two_args[1]" => "arg2"})
     end
     it "uses a text field by default for each argument type" do
       widget = Widget.new
       subject.scan_method(widget, :one_arg)
-      subject.htmlify(widget).should =~ %r{<input.*name="one_arg".*type="text"/>}
+      subject.htmlify(widget).should =~ %r{<input.*?name="one_arg".*?type="text"/>}
     end
     it "allows text as a field type" do
       widget = Widget.new
       subject.scan_method(widget, :one_arg, :type => 'text')
-      subject.htmlify(widget).should =~ %r{<input.*name="one_arg".*type="text"/>}
+      subject.htmlify(widget).should =~ %r{<input.*?name="one_arg".*?type="text"/>}
     end
     it "allows select as a field type" do
       widget = Widget.new
       subject.scan_method(widget, :one_arg, :type => 'select', :options => [['cheap', 'Honda'], ['expensive', 'Mercedes']])
-      match = %r{<select.*</select>}.match(subject.htmlify(widget))
+      match = %r{<select.*?</select>}.match(subject.htmlify(widget))
       match.should_not be_nil
       select = match[0]
-      select.should =~ %r{<option.*value="Honda".*>cheap</option>}
-      select.should =~ %r{<option.*value="Mercedes".*>expensive</option>}
+      select.should =~ %r{<option.*?value="Honda".*?>cheap</option>}
+      select.should =~ %r{<option.*?value="Mercedes".*?>expensive</option>}
     end
+    it "allows select as a field type with multiple arguments"
     it "allows radio buttons as a field type"
-    it "allows a check box as a field type"
+    it "allows a check box as a field type" do
+      pending
+      widget = Widget.new
+      subject.scan_method(widget, :no_args, :type => 'checkbox')
+      subject.htmlify(widget).should =~ %r{<input.*?name="no_args".*?type="checkbox".*?/>}
+      subject.scan_method(widget, :one_arg, :type => 'checkbox', :value => 'active')
+      subject.htmlify(widget).should =~ %r{<input.*?name="one_arg".*?type="checkbox".*?value="active".*?/>}
+    end
     it "fills in setter field defaults from corresponding getters"
     it "displays getters with no corresponding setters as static text"
+    it "translates invalid characters" do
+      pending
+      widget = Widget.new
+      class <<widget
+        def <<(arg); end
+      end
+      subject.scan_method(widget, :<<)
+    end
   end
   # [].methods.map{|m| method = a.method(m); "#{method.name}: #{method.arity}"}
   # ["inspect: 0", "to_s: 0", "to_a: 0", "to_ary: 0", "frozen?: 0", "==: 1", "eql?: 1", "hash: 0", "[]: -1", "[]=: -1", "at: 1", "fetch: -1", "first: -1", "last: -1", "concat: 1", "<<: 1", "push: -1", "pop: -1", "shift: -1", "unshift: -1", "insert: -1", "each: 0", "each_index: 0", "reverse_each: 0", "length: 0", "size: 0", "empty?: 0", "find_index: -1", "index: -1", "rindex: -1", "join: -1", "reverse: 0", "reverse!: 0", "rotate: -1", "rotate!: -1", "sort: 0", "sort!: 0", "sort_by!: 0", "collect: 0", "collect!: 0", "map: 0", "map!: 0", "select: 0", "select!: 0", "keep_if: 0", "values_at: -1", "delete: 1", "delete_at: 1", "delete_if: 0", "reject: 0", "reject!: 0", "zip: -1", "transpose: 0", "replace: 1", "clear: 0", "fill: -1", "include?: 1", "<=>: 1", "slice: -1", "slice!: -1", "assoc: 1", "rassoc: 1", "+: 1", "*: 1", "-: 1", "&: 1", "|: 1", "uniq: 0", "uniq!: 0", "compact: 0", "compact!: 0", "flatten: -1", "flatten!: -1", "count: -1", "shuffle!: 0", "shuffle: 0", "sample: -1", "cycle: -1", "permutation: -1", "combination: 1", "repeated_permutation: 1", "repeated_combination: 1", "product: -1", "take: 1", "take_while: 0", "drop: 1", "drop_while: 0", "pack: 1", "entries: -1", "sort_by: 0", "grep: 1", "find: -1", "detect: -1", "find_all: 0", "flat_map: 0", "collect_concat: 0", "inject: -1", "reduce: -1", "partition: 0", "group_by: 0", "all?: 0", "any?: 0", "one?: 0", "none?: 0", "min: 0", "max: 0", "minmax: 0", "min_by: 0", "max_by: 0", "minmax_by: 0", "member?: 1", "each_with_index: -1", "each_entry: -1", "each_slice: 1", "each_cons: 1", "each_with_object: 1", "chunk: -1", "slice_before: -1", "interesting_methods: 0", "nil?: 0", "===: 1", "=~: 1", "!~: 1", "class: 0", "singleton_class: 0", "clone: 0", "dup: 0", "initialize_dup: 1", "initialize_clone: 1", "taint: 0", "tainted?: 0", "untaint: 0", "untrust: 0", "untrusted?: 0", "trust: 0", "freeze: 0", "methods: -1", "singleton_methods: -1", "protected_methods: -1", "private_methods: -1", "public_methods: -1", "instance_variables: 0", "instance_variable_get: 1", "instance_variable_set: 2", "instance_variable_defined?: 1", "instance_of?: 1", "kind_of?: 1", "is_a?: 1", "tap: 0", "send: -1", "public_send: -1", "respond_to?: -1", "respond_to_missing?: 2", "extend: -1", "display: -1", "method: 1", "public_method: 1", "define_singleton_method: -1", "__id__: 0", "object_id: 0", "to_enum: -1", "enum_for: -1", "equal?: 1", "!: 0", "!=: 1", "instance_eval: -1", "instance_exec: -1", "__send__: -1"]
@@ -96,6 +121,11 @@ describe HTMLify::HTMLifier do
   describe "#scan_methods" do
     it "takes an array of method names to scan"
     it "scans all methods if none specified"
+    it "excludes inherited methods"
+  end
+  
+  describe "#scan_all_methods" do
+    it "includes inherited methods"
   end
   
   describe "#remove_method_html" do
